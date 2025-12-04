@@ -1,45 +1,45 @@
 from datetime import datetime
-from typing import List
-
-from ..storage.memory_store import MEMORY_STORE, Chat, Message
+from .job_manager import job_manager
+from ..storage.memory_store import MEMORY_STORE
 from ..utils.ids import new_id
+from ..llm.provider_registry import create_llm_client
 
 
-def create_chat(provider: str, model: str, agent_id: str, title: str | None = None) -> Chat:
-    """
-    Create and persist a new chat session in the in-memory store.
-    """
-    chat_id = new_id("chat")
-    chat = Chat(
-        id=chat_id,
-        provider=provider,
-        model=model,
-        agent_id=agent_id,
-        title=title,
-    )
-    MEMORY_STORE.save_chat(chat)
+def create_chat(provider: str, model: str, agent_id: str | None, title: str | None):
+    chat = MEMORY_STORE.create_chat(provider, model, agent_id, title)
     return chat
 
 
-def get_chat(chat_id: str) -> Chat:
-    """
-    Fetch an existing chat or raise KeyError if not found.
-    """
+def get_chat(chat_id: str):
     return MEMORY_STORE.get_chat(chat_id)
 
 
-def add_message(chat: Chat, role: str, content: str) -> Message:
-    """
-    Append a message to the given chat and return it.
-    """
-    message = Message(
-        role=role,  # type: ignore[arg-type]
-        content=content,
-        timestamp=datetime.utcnow(),
-    )
-    chat.messages.append(message)
-    return message
+def get_all_chats():
+    return MEMORY_STORE.get_all_chats()
 
 
-def get_history(chat: Chat) -> List[Message]:
-    return chat.messages
+def add_message(chat, role: str, content: str):
+    return MEMORY_STORE.add_message(chat.id, role, content)
+
+
+# ⭐ NORMAL CHAT MODE (NO AGENT, NO JOB ENGINE)
+async def run_normal_chat(chat_id: str, prompt: str) -> str:
+    chat = get_chat(chat_id)
+
+    # Build full history for LLM
+    history = [
+        {"role": m.role, "content": m.content}
+        for m in chat.messages
+    ]
+    history.append({"role": "user", "content": prompt})
+
+    llm = create_llm_client(chat.provider, chat.model)
+    response = await llm.chat(history)
+
+    assistant_reply = response.text
+
+    # Save in chat history
+    add_message(chat, "user", prompt)
+    add_message(chat, "assistant", assistant_reply)
+
+    return assistant_reply

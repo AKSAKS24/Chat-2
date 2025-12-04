@@ -24,7 +24,21 @@ class ChatResponse(BaseModel):
     title: Optional[str]
     created_at: datetime
 
+class ChatCreateRequest(BaseModel):
+    provider: str
+    model: str
+    agent_id: Optional[str] = None
+    title: Optional[str] = None
 
+
+class MessageRequest(BaseModel):
+    prompt: str
+
+
+class MessageResponse(BaseModel):
+    chat_id: str
+    message: str
+    
 class ChatHistoryResponse(BaseModel):
     chat_id: str
     messages: List[MessageSchema]
