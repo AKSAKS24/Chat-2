@@ -1,0 +1,205 @@
+# TECHNICAL SPECIFICATION RAG KNOWLEDGE BASE
+
+This knowledge base describes the expected structure, sections, and tone for a
+SAP ABAP Technical Specification (TS) + light Functional Specification (FS)
+where applicable.
+
+The goal: whenever an ABAP code snippet or requirement is provided, the AI
+should generate a PROFESSIONAL, WELL-STRUCTURED TS document that a SAP ABAP
+developer, reviewer, or architect can directly use in a project.
+
+----------------------------------------------------------------------
+1. GENERAL STYLE GUIDELINES
+----------------------------------------------------------------------
+
+- Tone: Professional, concise, and implementation-focused.
+- Target audience: SAP ABAP developers, technical leads, and reviewers.
+- Avoid generic fluff; always connect statements to actual objects and logic.
+- Use clear headings and bullet points where appropriate.
+- Use stable SAP terminology: "program", "function module", "BAdI", "CDS view",
+  "OData service", "SmartForm", "Adobe Form", "RAP BO", etc.
+
+----------------------------------------------------------------------
+2. RECOMMENDED TOP-LEVEL SECTIONS
+----------------------------------------------------------------------
+
+The document should generally follow this structure (you can skip irrelevant
+sections if not applicable):
+
+## Introduction
+- Brief overview of the objective of the development/change.
+- Mention whether it is a new development, enhancement, or remediation.
+- Mention relevant SAP module or business area (SD/MM/FI/PP/CO/etc.) if visible.
+
+## Business Requirement Overview
+- Short summary of the business requirement or problem statement inferred from
+  the code or comments.
+- If requirements are not clear from the code, mention assumptions explicitly.
+
+## Solution Overview
+- High-level description of how the ABAP solution addresses the requirement.
+- Mention whether it is a report, interface, conversion, enhancement, form,
+  workflow, or RAP BO, etc.
+- Highlight main processing steps at a conceptual level.
+
+## SAP Objects
+- List all primary SAP technical objects involved:
+  - Report program name (e.g., ZR_SD_SALES_REPORT)
+  - Function modules
+  - Classes & methods
+  - Interfaces
+  - Includes
+  - Tables / views / CDS views
+  - Data elements, domains if they are important
+  - Enhancements / BAdIs / User exits
+- For each important object, add a short purpose description.
+
+## Data Model
+- List the main database tables used (MARA, MARC, VBAK, VBAP, BKPF, BSEG, etc.).
+- For each table, describe:
+  - Why it is used
+  - Key fields
+- Describe any internal tables and structures that play a central role.
+- If code suggests S/4HANA migration context, mention MATDOC, ACDOCA, or
+  replacement tables appropriately.
+
+## Processing Logic
+- Describe the overall control flow:
+  - Selection screen (if any): parameters, select-options, obligatory fields.
+  - Main processing blocks (START-OF-SELECTION, AT SELECTION-SCREEN, FORM routines,
+    methods, event handlers, LOOPs).
+- Explain key algorithms:
+  - How data is selected (SELECT, joins, CDS views).
+  - Any complex loops, aggregations, or calculations.
+  - Any business rules identified in IF/CASE statements.
+- Mention performance relevant details (e.g., SELECT with WHERE on key fields).
+
+## Error Handling & Messages
+- List any MESSAGE statements, exceptions raised, or error logs.
+- Explain when each main error or warning occurs.
+- If there is no explicit error handling, mention that and optionally suggest
+  adding basic validation.
+
+## Performance & Security Considerations
+- Mention:
+  - Whether SELECT ... ENDSELECT or nested loops might cause performance issues.
+  - Whether SELECT * is used and can be optimized.
+  - If buffering, indexes, or CDS views could be leveraged.
+  - Any handling of authorization checks (AUTHORITY-CHECK).
+- Lightweight recommendations are welcome but stay realistic.
+
+## Output & Interface Details (if applicable)
+- For reports:
+  - ALV vs classical list
+  - Key columns, layout, totals/subtotals.
+- For forms:
+  - SmartForm / Adobe Form name
+  - Main windows or pages
+  - Key fields displayed.
+- For interfaces:
+  - IDoc type, message type OR
+  - File format (CSV, XML, JSON), Web service, OData, etc.
+
+## Transport & Dependencies
+- Mention:
+  - All objects that must be included in transport requests.
+  - Any prerequisite customizing or master data assumptions.
+  - Any dependent enhancements, BAdIs, or function modules that must exist.
+
+## Test Scenarios (Optional)
+- A few bullet points describing how to test the development:
+  - Positive scenario
+  - Edge cases
+  - Error scenarios
+
+----------------------------------------------------------------------
+3. TYPICAL MAPPING FROM ABAP CODE TO TS CONTENT
+----------------------------------------------------------------------
+
+When analyzing ABAP code:
+
+- REPORT <name> => main program name, "Type: Report".
+- INCLUDE <name> => supporting includes; describe usage briefly.
+- CLASS zcl_... DEFINITION/IMPLEMENTATION => global class; describe its role.
+- METHODS <name> => list only key methods; describe purpose.
+- SELECT ... FROM mara/marc/... => mention these tables in Data Model section.
+- SELECT-OPTIONS / PARAMETERS => document in Processing Logic under
+  "Selection Screen".
+- FORM <name> / PERFORM => describe as subroutines and processing steps.
+- MESSAGE eXXX(zmsg) => mention message usage in Error Handling.
+
+----------------------------------------------------------------------
+4. EXPECTED OUTPUT FORMAT
+----------------------------------------------------------------------
+
+The AI should output markdown using these conventions:
+
+- Use headings starting with "## " exactly as top-level sections.
+- Use bullet lists where appropriate.
+- Use concise but informative descriptions, not one-word summaries.
+- No need for strictly numbered headings, but do not remove the main sections
+  unless clearly irrelevant.
+
+Example skeleton:
+
+## Introduction
+<2-5 sentences>
+
+## Business Requirement Overview
+<2-6 bullets or short paragraphs>
+
+## Solution Overview
+<high-level technical description>
+
+## SAP Objects
+- Program: ZR_XXXX_YYYY - Short purpose
+- Table: VBAK - Sales document header
+- Class: ZCL_XXXX_YYYY - Main business logic
+
+## Data Model
+- Table VBAK:
+  - Used to fetch sales order header details
+  - Key fields: VBELN, VKORG, etc.
+- Table VBAP:
+  - Used for item-level data
+  ...
+
+## Processing Logic
+- Selection screen:
+  - Parameters: P_VBELN, P_DATE
+- Main steps:
+  - Step 1: Read input selection
+  - Step 2: Select data from VBAK/VBAP
+  - Step 3: Apply filters
+  - Step 4: Display ALV output
+  ...
+
+## Error Handling & Messages
+- Message E001(ZSD_MSG): Displayed when no data found for the given selection
+- Message W010(ZSD_MSG): Warning when partial data exists
+...
+
+## Performance & Security Considerations
+- SELECT ... WHERE VBELN IN S_VBELN to restrict data
+- Potential improvement: Replace SELECT * with field list
+- Authorization: Ensure AUTHORITY-CHECK for sales organization
+
+## Output & Interface Details
+- ALV grid output using CL_SALV_TABLE
+- Key columns: Sales Document, Item, Material, Quantity, Net Value
+
+## Transport & Dependencies
+- Objects:
+  - Program ZR_XXXX_YYYY
+  - Message class ZSD_MSG
+  - Class ZCL_XXXX_YYYY
+- Dependencies:
+  - Customizing for sales document types should be in place.
+
+## Test Scenarios (Optional)
+- Scenario 1: Valid sales order with full data
+- Scenario 2: No data for given date range
+- Scenario 3: Unauthorized user (expect error message)
+
+
+End of TS RAG KB.
