@@ -1,10 +1,8 @@
 """
 memory_store.py
 ---------------
-Simple in-memory persistence layer for Chats, Messages, and Jobs.
-
-⚠️ This is NOT a database – it is only suitable for development and
-single-process deployments. Replace with Redis/Postgres in production.
+In-memory persistence layer for Chats, Messages, and Jobs.
+Suitable for development & single-process deployments.
 """
 
 from __future__ import annotations
@@ -20,6 +18,10 @@ MessageRole = Literal["user", "assistant", "system"]
 JobStatusType = Literal["queued", "running", "completed", "failed"]
 
 
+# ------------------------------------------------------------
+# Data models
+# ------------------------------------------------------------
+
 @dataclass
 class Message:
     role: MessageRole
@@ -32,7 +34,7 @@ class Chat:
     id: str
     provider: str
     model: str
-    agent_id: str
+    agent_id: Optional[str] = None
     title: Optional[str] = None
     messages: List[Message] = field(default_factory=list)
 
@@ -47,21 +49,20 @@ class Job:
     logs: List[str] = field(default_factory=list)
     result_message: Optional[str] = None
 
-    # Optional: for downloadable generated DOCX/ZIP files
     output_docx_path: Optional[str] = None
-
-    # Optional: preserve entire structured result (text, json, paths etc.)
     output_payload: Optional[Dict[str, Any]] = None
 
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+# ------------------------------------------------------------
+# MemoryStore Implementation
+# ------------------------------------------------------------
+
 class MemoryStore:
     """
-    Generic in-memory storage with a simple asyncio lock for jobs.
-    Chats are mutated in-place but job lifecycle updates go through
-    `update_job` for consistent logging and status management.
+    In-memory storage for Chats, Messages, Jobs.
     """
 
     def __init__(self) -> None:
@@ -69,7 +70,21 @@ class MemoryStore:
         self.jobs: Dict[str, Job] = {}
         self._lock = asyncio.Lock()
 
-    # ---------- Chat helpers ----------
+    # --------------------------------------------------------
+    # CHAT HELPERS
+    # --------------------------------------------------------
+
+    def create_chat(self, provider: str, model: str, agent_id: Optional[str], title: Optional[str]) -> Chat:
+        chat_id = f"chat_{uuid.uuid4().hex[:12]}"
+        chat = Chat(
+            id=chat_id,
+            provider=provider,
+            model=model,
+            agent_id=agent_id,
+            title=title,
+        )
+        self.chats[chat_id] = chat
+        return chat
 
     def save_chat(self, chat: Chat) -> Chat:
         self.chats[chat.id] = chat
@@ -81,7 +96,22 @@ class MemoryStore:
             raise KeyError(f"Chat {chat_id} not found")
         return chat
 
-    # ---------- Job helpers ----------
+    def get_all_chats(self) -> List[Chat]:
+        return list(self.chats.values())
+
+    def add_message(self, chat_id: str, role: MessageRole, content: str) -> Message:
+        chat = self.get_chat(chat_id)
+        message = Message(
+            role=role,
+            content=content,
+            timestamp=datetime.utcnow(),
+        )
+        chat.messages.append(message)
+        return message
+
+    # --------------------------------------------------------
+    # JOB HELPERS
+    # --------------------------------------------------------
 
     def create_job(
         self,
@@ -117,10 +147,7 @@ class MemoryStore:
         output_payload: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
     ) -> Job:
-        """
-        Atomically update a job. All fields are optional and only
-        non-None values are applied.
-        """
+
         async with self._lock:
             job = self.get_job(job_id)
 
@@ -140,5 +167,5 @@ class MemoryStore:
             return job
 
 
-# Global singleton used throughout the app
+# Global singleton
 MEMORY_STORE = MemoryStore()
